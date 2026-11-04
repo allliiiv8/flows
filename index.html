@@ -617,6 +617,11 @@ select { padding-inline-end: 40px; }
 .welcome p { font-size: 17px; }
 .sec-h .lnk, .banner .go, a.lnk { text-decoration: none; }
 .hero .meter.spend i { background: #2997FF; }
+/* الشريط العلوي: يمشي مع الصفحة (عنوان كبير زي iOS) وبعيد عن منطقة الساعة عشان iOS ما يغبّش الأزرار */
+.top { position: relative; top: auto; padding-top: calc(var(--safe-t) + 14px); }
+.top-in { min-height: 56px; }
+body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 0; height: var(--safe-t); background: var(--page); pointer-events: none; }
+.toolbar { top: var(--safe-t); padding-top: 8px; }
 </style>
 </head>
 <body>
