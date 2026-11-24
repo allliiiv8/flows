@@ -627,6 +627,11 @@ body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 
 .alias-box { padding: 4px 16px; margin-top: 12px; border-radius: var(--r-ctl); background: var(--surface); }
 .sheet .alias-box { background: var(--sheet-card); }
 .rule .rn { display: block; font-size: 13px; font-weight: 400; color: var(--palm); direction: rtl; text-align: right; overflow: hidden; text-overflow: ellipsis; }
+.alias-box { padding: 14px 16px; margin-top: 0; }
+.al-row { display: grid; gap: 6px; }
+.al-row + .al-row { margin-top: 12px; }
+.al-k { font-size: 15px; font-weight: 600; color: var(--ink); }
+.alias-box .msgname { background: var(--surface-3); color: var(--ink); font-weight: 600; direction: ltr; text-align: right; }
 </style>
 </head>
 <body>
@@ -2477,9 +2482,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
         return '<button type="button" role="radio" aria-checked="' + (d.type === x[0]) + '" class="' + (d.type === x[0] ? 'on' : '') + '" data-act="f-ttype" data-v="' + x[0] + '">' + x[1] + '</button>';
       }).join('') + '</div>' +
       '<label class="amt-in"><input id="f-amt" inputmode="decimal" placeholder="0.00" value="' + (d.amount === '' ? '' : esc(String(d.amount))) + '" aria-label="المبلغ"><span>ر.س</span></label>' +
-      (fromMsg ? '<div class="field"><span class="flabel">اسم التاجر في الرسالة</span><div class="msgname" dir="auto">' + esc(origName || '—') + '</div></div>' : '') +
-      '<div class="field"><label for="f-merch">' + (fromMsg ? 'اسم المتجر الحقيقي' : 'التاجر أو الجهة') + '</label><input class="inp" id="f-merch" dir="auto" value="' + esc(d.merchant) + '" placeholder="مثلاً: دانكن" autocomplete="off"></div>' +
-      (fromMsg && origName ? '<div class="pad alias-box"><label class="toggle"><span><b style="font-weight:600">اعتمده دايماً لهذا التاجر</b><span class="hint" id="f-alias-h" style="display:block;margin:2px 0 0">أي رسالة فيها «<bdi>' + esc(aliasPat) + '</bdi>» تنسجل باسم المتجر اللي كتبته، وبنفس التصنيف.</span></span><input type="checkbox" id="f-alias" checked></label></div>' : '') +
+      (fromMsg && origName ? '<div class="field"><span class="flabel">اسم المتجر</span><div class="alias-box">' +
+        '<div class="al-row"><span class="al-k">إذا كان اسم التاجر</span><span class="msgname" dir="auto">' + esc(origName) + '</span></div>' +
+        '<div class="al-row"><label class="al-k" for="f-merch">راح أسجله باسم</label><input class="inp" id="f-merch" dir="auto" value="' + esc(d.merchant === origName ? '' : d.merchant) + '" placeholder="اكتب اسم المتجر، مثلاً: دانكن" autocomplete="off"></div>' +
+        '<p class="hint" style="margin:8px 2px 0">ينطبق على كل عملياته السابقة والجاية، وبالتصنيف اللي تختاره تحت.</p></div></div>'
+      : '<div class="field"><label for="f-merch">التاجر أو الجهة</label><input class="inp" id="f-merch" dir="auto" value="' + esc(d.merchant) + '" placeholder="مثلاً: ستاربكس" autocomplete="off"></div>') +
       '<div class="field"><span class="flabel">التصنيف</span><div id="f-cats">' + catChips(d.type, S.form.cat) + '</div></div>' +
       '<div class="row2"><div class="field"><label for="f-date">التاريخ والوقت</label><input class="inp" type="datetime-local" id="f-date" value="' + toLocalInput(d.date) + '"></div>' +
       '<div class="field"><label for="f-card">آخر 4 أرقام</label><input class="inp" id="f-card" inputmode="numeric" maxlength="4" value="' + esc(d.card || '') + '" placeholder="اختياري"></div></div>' +
@@ -2507,8 +2514,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     var note = $('#f-note').value.trim().slice(0, 200);
     var t = S.form.id ? S.txById.get(S.form.id) : null, isNew = !t;
     var catChanged = t && t.cat !== cat && type !== 'transfer';
-    var aliasEl = $('#f-alias'), wantAlias = !!(t && t.raw && aliasEl && aliasEl.checked && merchant && S.form.origName && Parser.norm(merchant) !== Parser.norm(S.form.origName) && (!S.form.hadAlias || merchant !== t.merchant || catChanged));
-    var dropAlias = !!(t && S.form.hadAlias && aliasEl && !aliasEl.checked);
+    var isAliasForm = !!(t && t.raw && S.form.origName);
+    var sameAsOrig = Parser.norm(merchant) === Parser.norm(S.form.origName || '');
+    var wantAlias = !!(isAliasForm && merchant && !sameAsOrig && (!S.form.hadAlias || merchant !== t.merchant || catChanged));
+    var dropAlias = !!(isAliasForm && S.form.hadAlias && (!merchant || sameAsOrig));
+    if (isAliasForm && !merchant) merchant = S.form.origName;
     var aliasPat = S.form.aliasPat;
     if (t && t.raw && !t.mraw && merchant !== t.merchant) t.mraw = t.merchant;
     if (!t) {
@@ -2525,9 +2535,14 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     if (dropAlias) {
       var ar = aliasRule(t);
       if (ar) {
-        if (ar.cat) { delete ar.name; persist({ put: { rules: [ar] } }); }
-        else { S.rules = S.rules.filter(function (x) { return x.id !== ar.id; }); persist({ del: { rules: [ar.id] } }); }
-        reindex(); render(); toast('ما عاد يعتمد اسم المتجر لهذا التاجر'); return;
+        var oldName = ar.name, back = [];
+        S.rules = S.rules.filter(function (x) { return x.id !== ar.id; }); persist({ del: { rules: [ar.id] } });
+        reindex();
+        S.tx.forEach(function (x) {
+          if (x.mraw && x.merchant === oldName && !aliasRule(x)) { x.merchant = x.mraw; if (x.type !== 'transfer') { x.catLocked = false; x.cat = autoCat(x); } x.updated = Date.now(); back.push(x); }
+        });
+        if (back.length) persist({ put: { tx: back } });
+        reindex(); render(); toast('رجع يسجله باسمه الأصلي'); return;
       }
     }
     if (wantAlias) {
