@@ -622,6 +622,11 @@ select { padding-inline-end: 40px; }
 .top-in { min-height: 56px; }
 body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 0; height: var(--safe-t); background: var(--page); pointer-events: none; }
 .toolbar { top: var(--safe-t); padding-top: 8px; }
+.msgname { min-height: 44px; padding: 11px 16px; border-radius: var(--r-ctl); background: var(--surface-2); color: var(--ink-2); font-size: 16px; word-break: break-word; }
+.sheet .msgname { background: var(--sheet-card); }
+.alias-box { padding: 4px 16px; margin-top: 12px; border-radius: var(--r-ctl); background: var(--surface); }
+.sheet .alias-box { background: var(--sheet-card); }
+.rule .rn { display: block; font-size: 13px; font-weight: 400; color: var(--palm); direction: rtl; text-align: right; overflow: hidden; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
@@ -1828,10 +1833,47 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   function autoCat(t) {
     if (t.type === 'transfer') return 'transfer';
     var builtinOK = !t.sub || BUILTIN_SUBS.indexOf(t.sub) >= 0;
-    var r = Parser.matchRule(t.merchant, S.prep, { accept: function (rule) { return (!rule.sys || builtinOK) && catType(rule.cat) === t.type; } });
+    var opt = { accept: function (rule) { return (!rule.sys || builtinOK) && catType(rule.cat) === t.type; } };
+    var r = (t.mraw && t.mraw !== t.merchant ? Parser.matchRule(t.mraw, S.prep, opt) : null) || Parser.matchRule(t.merchant, S.prep, opt);
     if (r) return r.cat;
     if (t.catHint && S.catById.has(t.catHint) && catType(t.catHint) === t.type) return t.catHint;
     return t.type === 'income' ? 'in_other' : 'other';
+  }
+  // اسم المتجر: إذا اسم التاجر في الرسالة يختلف عن المحل (مثل عبد اللطيف جميل ← دانكن)
+  function aliasRule(t) {
+    return Parser.matchRule(t.mraw || t.merchant, S.prep, { accept: function (r) { return !r.sys && !!r.name; } });
+  }
+  function applyAlias(t) {
+    var r = aliasRule(t);
+    if (!r) return false;
+    if (!t.mraw) t.mraw = t.merchant;
+    if (t.merchant === r.name) return false;
+    t.merchant = r.name;
+    return true;
+  }
+  function aliasCount(pat) {
+    var re = Parser.compilePat(pat);
+    if (!re) return 0;
+    return S.tx.filter(function (x) { return re.test(Parser.norm(x.mraw || x.merchant)); }).length;
+  }
+  // يحفظ قاعدة اسم متجر ويطبقها على العمليات السابقة
+  function saveAlias(pat, name, cat) {
+    var rule = S.rules.filter(function (x) { return !x.sys && Parser.norm(x.pat) === Parser.norm(pat); })[0];
+    if (rule) { rule.name = name; rule.on = true; if (cat) rule.cat = cat; }
+    else { rule = { id: uid('u'), pat: pat.slice(0, 60), name: name.slice(0, 60), cat: cat || '', sys: false, on: true, created: Date.now() }; S.rules.push(rule); }
+    reindex();
+    var re = Parser.compilePat(pat), changed = [];
+    S.tx.forEach(function (x) {
+      if (!re || !re.test(Parser.norm(x.mraw || x.merchant))) return;
+      if (!x.mraw) x.mraw = x.merchant;
+      x.merchant = rule.name;
+      if (rule.cat && catType(rule.cat) === x.type) { if (!x.catLocked || x.cat === rule.cat) x.cat = rule.cat; }
+      else if (!x.catLocked && x.type !== 'transfer') x.cat = autoCat(x);
+      x.updated = Date.now(); changed.push(x);
+    });
+    reindex();
+    persist({ put: { rules: [rule], tx: changed } });
+    return changed.length;
   }
   function defaultCat(type) { return type === 'income' ? 'in_other' : type === 'transfer' ? 'transfer' : 'other'; }
 
@@ -1846,6 +1888,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       reasons: p.reasons.slice(), note: p.note || '', catLocked: false, demo: !!demo, created: Date.now(), updated: Date.now(),
       currency: p.currency || 'SAR', origAmount: p.origAmount == null ? null : p.origAmount, sub: p.sub || null, catHint: p.catHint || null
     };
+    applyAlias(t);
     t.cat = autoCat(t);
     return t;
   }
@@ -1869,8 +1912,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   }
   function mergeInto(a, b) {
     a.srcs = (a.srcs || [a.src]).concat((b.srcs || [b.src]).filter(function (s) { return (a.srcs || [a.src]).indexOf(s) < 0; }));
-    if (b.src === 'WALLET' && b.merchant) a.merchant = b.merchant;
-    else if (!a.merchant) a.merchant = b.merchant;
+    if ((b.src === 'WALLET' && b.merchant) || !a.merchant) { a.merchant = b.merchant; if (b.mraw) a.mraw = b.mraw; else delete a.mraw; }
+    applyAlias(a);
     if (!a.card) a.card = b.card;
     if (a.balance == null) a.balance = b.balance;
     if (!a.bank) a.bank = b.bank;
@@ -2377,7 +2420,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       if (p && (t.date < p.start || t.date >= p.end)) return false;
       if (f.cat !== 'all' && t.cat !== f.cat) return false;
       if (q) {
-        var hay = Parser.fold([t.merchant, t.note, catOf(t.cat).name, t.raw, t.card, t.bank, nf2.format(t.amount)].join(' '));
+        var hay = Parser.fold([t.merchant, t.mraw || '', t.note, catOf(t.cat).name, t.raw, t.card, t.bank, nf2.format(t.amount)].join(' '));
         if (hay.indexOf(q) < 0 && !(qn > 0 && Math.abs(t.amount - qn) < 0.005)) return false;
       }
       return true;
@@ -2423,6 +2466,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     }
     var src = '';
     if (t && t.raw) src = '<details class="raw"><summary>نص الرسالة الأصلي' + ((t.srcs || []).length > 1 ? ' (SMS + Wallet)' : '') + '</summary><pre dir="auto">' + esc(t.raw) + '</pre></details>';
+    var fromMsg = !!(t && t.raw), origName = t ? (t.mraw || t.merchant || '') : '';
+    var curAlias = t ? aliasRule(t) : null, hasAlias = !!curAlias;
+    var aliasPat = curAlias ? curAlias.pat : Parser.merchantLabel(origName) || origName;
+    S.form.origName = origName; S.form.aliasPat = aliasPat; S.form.hadAlias = hasAlias;
     var meta = '';
     if (t && (t.bank || t.balance != null)) meta = '<p class="hint">' + (t.bank ? 'البنك: ' + esc(t.bank) : '') + (t.balance != null ? (t.bank ? '، ' : '') + 'الرصيد بعد العملية: ' + moneyT(t.balance) : '') + '</p>';
     var body = why +
@@ -2430,7 +2477,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
         return '<button type="button" role="radio" aria-checked="' + (d.type === x[0]) + '" class="' + (d.type === x[0] ? 'on' : '') + '" data-act="f-ttype" data-v="' + x[0] + '">' + x[1] + '</button>';
       }).join('') + '</div>' +
       '<label class="amt-in"><input id="f-amt" inputmode="decimal" placeholder="0.00" value="' + (d.amount === '' ? '' : esc(String(d.amount))) + '" aria-label="المبلغ"><span>ر.س</span></label>' +
-      '<div class="field"><label for="f-merch">التاجر أو الجهة</label><input class="inp" id="f-merch" dir="auto" value="' + esc(d.merchant) + '" placeholder="مثلاً: ستاربكس" autocomplete="off"></div>' +
+      (fromMsg ? '<div class="field"><span class="flabel">اسم التاجر في الرسالة</span><div class="msgname" dir="auto">' + esc(origName || '—') + '</div></div>' : '') +
+      '<div class="field"><label for="f-merch">' + (fromMsg ? 'اسم المتجر الحقيقي' : 'التاجر أو الجهة') + '</label><input class="inp" id="f-merch" dir="auto" value="' + esc(d.merchant) + '" placeholder="مثلاً: دانكن" autocomplete="off"></div>' +
+      (fromMsg && origName ? '<div class="pad alias-box"><label class="toggle"><span><b style="font-weight:600">اعتمده دايماً لهذا التاجر</b><span class="hint" id="f-alias-h" style="display:block;margin:2px 0 0">أي رسالة فيها «<bdi>' + esc(aliasPat) + '</bdi>» تنسجل باسم المتجر اللي كتبته، وبنفس التصنيف.</span></span><input type="checkbox" id="f-alias" checked></label></div>' : '') +
       '<div class="field"><span class="flabel">التصنيف</span><div id="f-cats">' + catChips(d.type, S.form.cat) + '</div></div>' +
       '<div class="row2"><div class="field"><label for="f-date">التاريخ والوقت</label><input class="inp" type="datetime-local" id="f-date" value="' + toLocalInput(d.date) + '"></div>' +
       '<div class="field"><label for="f-card">آخر 4 أرقام</label><input class="inp" id="f-card" inputmode="numeric" maxlength="4" value="' + esc(d.card || '') + '" placeholder="اختياري"></div></div>' +
@@ -2458,6 +2507,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     var note = $('#f-note').value.trim().slice(0, 200);
     var t = S.form.id ? S.txById.get(S.form.id) : null, isNew = !t;
     var catChanged = t && t.cat !== cat && type !== 'transfer';
+    var aliasEl = $('#f-alias'), wantAlias = !!(t && t.raw && aliasEl && aliasEl.checked && merchant && S.form.origName && Parser.norm(merchant) !== Parser.norm(S.form.origName) && (!S.form.hadAlias || merchant !== t.merchant || catChanged));
+    var dropAlias = !!(t && S.form.hadAlias && aliasEl && !aliasEl.checked);
+    var aliasPat = S.form.aliasPat;
+    if (t && t.raw && !t.mraw && merchant !== t.merchant) t.mraw = t.merchant;
     if (!t) {
       t = { id: uid('t'), src: 'MANUAL', srcs: ['MANUAL'], via: 'manual', raw: '', rh: [], status: 'ok', reasons: [], created: Date.now(), demo: false, catLocked: true, currency: 'SAR', origAmount: null, sub: null, balance: null, bank: '' };
       S.tx.push(t);
@@ -2469,6 +2522,20 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     reindex();
     persist({ put: { tx: [t] } });
     render();
+    if (dropAlias) {
+      var ar = aliasRule(t);
+      if (ar) {
+        if (ar.cat) { delete ar.name; persist({ put: { rules: [ar] } }); }
+        else { S.rules = S.rules.filter(function (x) { return x.id !== ar.id; }); persist({ del: { rules: [ar.id] } }); }
+        reindex(); render(); toast('ما عاد يعتمد اسم المتجر لهذا التاجر'); return;
+      }
+    }
+    if (wantAlias) {
+      var n = saveAlias(aliasPat, merchant, type === 'transfer' ? '' : cat);
+      render();
+      toast('اعتمدت «' + merchant + '» لكل رسائل «' + aliasPat + '»' + (n > 1 ? '، وتحدثت ' + txCount(n) : ''));
+      return;
+    }
     toast(isNew ? 'انضافت العملية' : approve ? 'اعتمدت العملية' : 'انحفظت التعديلات');
     if (catChanged && merchant) setTimeout(function () { askLearn(t); }, 250);
   }
@@ -2477,7 +2544,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     var count = function (pat) {
       var re = Parser.compilePat(pat);
       if (!re) return 0;
-      return S.tx.filter(function (x) { return x.type === c.type && re.test(Parser.norm(x.merchant)); }).length;
+      return S.tx.filter(function (x) { return x.type === c.type && (re.test(Parser.norm(x.merchant)) || (x.mraw && re.test(Parser.norm(x.mraw)))); }).length;
     };
     dialog({
       title: 'أطبقه على كل عمليات هذا التاجر؟',
@@ -2499,7 +2566,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       else { rule = { id: uid('u'), pat: pat, cat: t.cat, sys: false, on: true, created: Date.now() }; S.rules.push(rule); }
       var re = Parser.compilePat(pat), changed = [];
       S.tx.forEach(function (x) {
-        if (x.type !== c.type || !re || !re.test(Parser.norm(x.merchant)) || x.cat === t.cat) return;
+        if (x.type !== c.type || !re || !(re.test(Parser.norm(x.merchant)) || (x.mraw && re.test(Parser.norm(x.mraw)))) || x.cat === t.cat) return;
         x.cat = t.cat; x.catLocked = false; x.updated = Date.now(); changed.push(x);
       });
       reindex();
@@ -2829,7 +2896,9 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       if (!ok) return;
       var txs = [], rules = [], cms = [];
       S.tx.forEach(function (t) { if (t.cat === id) { t.cat = to; txs.push(t); } });
-      S.rules = S.rules.filter(function (r) { if (r.cat === id) { rules.push(r.id); return false; } return true; });
+      var keep = [];
+      S.rules = S.rules.filter(function (r) { if (r.cat === id) { if (r.name) { r.cat = ''; keep.push(r); return true; } rules.push(r.id); return false; } return true; });
+      if (keep.length) persist({ put: { rules: keep } });
       S.commits.forEach(function (x) { if (x.cat === id) { x.cat = 'other'; cms.push(x); } });
       S.cats = S.cats.filter(function (x) { return x.id !== id; });
       reindex();
@@ -2842,7 +2911,7 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   function ruleListHTML() {
     var tab = S.ui.ruleTab, q = Parser.norm(S.ui.ruleQ || '');
     var list = S.rules.filter(function (r) { return (tab === 'user') === !r.sys; })
-      .filter(function (r) { return !q || Parser.norm(r.pat).indexOf(q) >= 0 || Parser.norm(catOf(r.cat).name).indexOf(q) >= 0; });
+      .filter(function (r) { return !q || Parser.norm(r.pat).indexOf(q) >= 0 || Parser.norm(r.name || '').indexOf(q) >= 0 || (r.cat && Parser.norm(catOf(r.cat).name).indexOf(q) >= 0); });
     list.sort(function (a, b) { return (b.created || 0) - (a.created || 0) || String(a.pat).localeCompare(String(b.pat)); });
     if (!list.length) return '<p class="empty">' + (tab === 'user' && !q ? 'ما عندك قواعد مخصصة. لما تغير تصنيف عملية أسألك إذا تبي تحفظها قاعدة.' : 'ما فيه نتائج.') + '</p>';
     return list.map(ruleRow).join('');
@@ -2851,9 +2920,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     var tab = S.ui.ruleTab;
     var user = S.rules.filter(function (r) { return !r.sys; }), sys = S.rules.filter(function (r) { return r.sys; });
     var h = '<div class="panel"><b style="font-size:15px">قاعدة جديدة</b><div class="field"><label for="r-pat">إذا اسم التاجر يحتوي</label><input class="inp" id="r-pat" dir="auto" placeholder="مثلاً: KUDU أو كودو"></div>' +
-      '<div class="field"><label for="r-cat">صنّفها</label><select id="r-cat">' + catOptions('food', false) + '</select></div>' +
+      '<div class="field"><label for="r-name">سجّلها باسم المتجر (اختياري)</label><input class="inp" id="r-name" dir="auto" placeholder="مثلاً: دانكن"></div>' +
+      '<div class="field"><label for="r-cat">صنّفها</label><select id="r-cat"><option value="" selected>تلقائي (حسب اسم المتجر)</option>' + catOptions('', false) + '</select></div>' +
       '<div class="btns"><button class="btn pri block" data-act="rule-add">' + I.plus + ' إضافة القاعدة</button></div>' +
-      '<p class="hint" style="margin:8px 2px 0">قواعدك تتقدم على الجاهزة. اكتب = قبل الكلمة إذا تبيها كلمة كاملة، مثل =زين.</p></div>';
+      '<p class="hint" style="margin:8px 2px 0">إذا اسم التاجر في الرسالة يختلف عن المحل (مثل عبد اللطيف جميل لدانكن)، اكتب اسم المحل في «سجّلها باسم». قواعدك تتقدم على الجاهزة. اكتب = قبل الكلمة إذا تبيها كلمة كاملة، مثل =زين.</p></div>';
     h += '<div class="chips" style="margin-top:16px"><button class="chip' + (tab === 'user' ? ' on' : '') + '" data-act="rule-tab" data-v="user">قواعدي (' + user.length + ')</button><button class="chip' + (tab === 'sys' ? ' on' : '') + '" data-act="rule-tab" data-v="sys">الجاهزة (' + sys.length + ')</button></div>';
     h += '<div class="search" style="margin-top:10px">' + I.search + '<input type="search" id="rule-q" placeholder="ابحث في القواعد" value="' + esc(S.ui.ruleQ || '') + '" autocomplete="off" aria-label="بحث في القواعد"></div>';
     h += '<div class="panel flush" style="margin-top:10px" id="rule-list">' + ruleListHTML() + '</div>';
@@ -2862,28 +2932,30 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     return h;
   }
   function ruleRow(r) {
-    var c = catOf(r.cat);
-    return '<div class="rule"><span class="rp">' + esc(r.pat) + '</span><span class="rc">' + esc(c.icon + ' ' + c.name) + '</span>' +
+    var c = r.cat ? catOf(r.cat) : null;
+    return '<div class="rule"><span class="rp">' + esc(r.pat) + (r.name ? '<span class="rn" dir="auto">← ' + esc(r.name) + '</span>' : '') + '</span><span class="rc">' + (c ? esc(c.icon + ' ' + c.name) : 'تلقائي') + '</span>' +
       '<label class="toggle mini-toggle" style="min-height:0"><span class="sr">تفعيل</span><input type="checkbox" data-act="rule-on" data-id="' + r.id + '"' + (r.on !== false ? ' checked' : '') + '></label>' +
       '<button class="x" data-act="rule-del" data-id="' + r.id + '" aria-label="حذف القاعدة">' + I.trash + '</button></div>';
   }
   function addRule() {
-    var pat = $('#r-pat').value.trim(), cat = $('#r-cat').value;
+    var pat = $('#r-pat').value.trim(), cat = $('#r-cat').value, name = $('#r-name').value.trim();
     if (Parser.norm(pat.replace(/^=/, '')).length < 2) { toast('اكتب كلمة من حرفين أو أكثر', 'err'); return; }
+    if (!name && !cat) { toast('اختر تصنيف أو اكتب اسم المتجر', 'err'); return; }
+    S.ui.ruleTab = 'user';
+    if (name) { var n = saveAlias(pat, name, cat); render(); toast('انضافت القاعدة' + (n ? ' وتحدثت ' + txCount(n) : '')); return; }
     var r = { id: uid('u'), pat: pat.slice(0, 60), cat: cat, sys: false, on: true, created: Date.now() };
     S.rules.push(r);
     reindex();
     persist({ put: { rules: [r] } });
-    S.ui.ruleTab = 'user';
     render();
     toast('انضافت القاعدة. طبّقها على العمليات الحالية من الزر تحت.');
   }
   function applyRules() {
     var changed = [];
     S.tx.forEach(function (t) {
-      if (t.catLocked || t.type === 'transfer') return;
-      var c = autoCat(t);
-      if (c !== t.cat) { t.cat = c; t.updated = Date.now(); changed.push(t); }
+      var ch = applyAlias(t);
+      if (!t.catLocked && t.type !== 'transfer') { var c = autoCat(t); if (c !== t.cat) { t.cat = c; ch = true; } }
+      if (ch) { t.updated = Date.now(); changed.push(t); }
     });
     invalidate();
     persist({ put: { tx: changed } });
@@ -2950,12 +3022,12 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
   function exportCSV() {
-    var head = ['التاريخ', 'الوقت', 'النوع', 'المبلغ', 'المبلغ بالإشارة', 'التصنيف', 'التاجر أو الجهة', 'البطاقة', 'البنك', 'المصدر', 'الحالة', 'ملاحظة', 'نص الرسالة'];
+    var head = ['التاريخ', 'الوقت', 'النوع', 'المبلغ', 'المبلغ بالإشارة', 'التصنيف', 'التاجر أو الجهة', 'الاسم في الرسالة', 'البطاقة', 'البنك', 'المصدر', 'الحالة', 'ملاحظة', 'نص الرسالة'];
     var rows = S.tx.slice().sort(function (a, b) { return a.date - b.date; }).map(function (t) {
       var d = new Date(t.date);
       var signed = t.type === 'expense' ? -t.amount : t.type === 'income' ? t.amount : 0;
       return [d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), pad(d.getHours()) + ':' + pad(d.getMinutes()),
-        t.type === 'income' ? 'دخل' : t.type === 'transfer' ? 'تحويل' : 'مصروف', t.amount.toFixed(2), signed.toFixed(2), catOf(t.cat).name, t.merchant, t.card, t.bank,
+        t.type === 'income' ? 'دخل' : t.type === 'transfer' ? 'تحويل' : 'مصروف', t.amount.toFixed(2), signed.toFixed(2), catOf(t.cat).name, t.merchant, t.mraw || '', t.card, t.bank,
         (t.srcs || [t.src]).join('+'), t.status === 'review' ? 'مراجعة' : 'معتمدة', t.note, (t.raw || '').replace(/\s*\n\s*/g, ' | ')].map(csvCell).join(',');
     });
     var csv = '﻿' + [head.map(csvCell).join(',')].concat(rows).join('\r\n');
