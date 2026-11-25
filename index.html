@@ -632,6 +632,12 @@ body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 
 .al-row + .al-row { margin-top: 12px; }
 .al-k { font-size: 15px; font-weight: 600; color: var(--ink); }
 .alias-box .msgname { background: var(--surface-3); color: var(--ink); font-weight: 600; direction: ltr; text-align: right; }
+/* النوافذ المنبثقة: تبدأ تحت منطقة الساعة عشان iOS ما يغبّش العنوان وزر الإغلاق */
+.sheet { max-height: calc(100vh - var(--safe-t) - 16px); }
+@supports (height: 100dvh) { .sheet { max-height: calc(100dvh - var(--safe-t) - 16px); } }
+.dlg-wrap { padding-top: calc(var(--safe-t) + 20px); }
+.dlg { max-height: calc(100vh - var(--safe-t) - 60px); }
+.btn { white-space: nowrap; }
 </style>
 </head>
 <body>
