@@ -2,7 +2,7 @@
 <html lang="en" dir="ltr">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; manifest-src 'self' blob: data:; worker-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <title>Halala</title>
 <meta name="description" content="Personal finance from your bank messages. All data stays on your device.">
@@ -644,6 +644,92 @@ body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 
 .amt-in input { text-align: left; }
 .sheet-h { padding: 10px 16px 6px 12px; }
 .sec-h .lnk { white-space: nowrap; }
+
+/* ===================== حركة وإحساس التطبيقات ===================== */
+:root { --ease: cubic-bezier(.32, .72, 0, 1); --spring: cubic-bezier(.34, 1.56, .64, 1); }
+html { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+input, textarea, select, pre, .raw, .kv .v { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+svg, img { -webkit-user-drag: none; }
+.hero .big, .cell .v, .cm-sum b { font-variant-numeric: tabular-nums; }
+
+/* انتقال الصفحات */
+#topbar.v-fade { animation: tFade .3s var(--ease) both; }
+#topbar.v-push, #view.v-push { animation: vPush .46s var(--ease) both; }
+#topbar.v-pop, #view.v-pop { animation: vPop .46s var(--ease) both; }
+@keyframes tFade { from { opacity: 0; } }
+@keyframes vPush { from { opacity: .3; transform: translateX(32%); } }
+@keyframes vPop { from { opacity: .3; transform: translateX(-24%); } }
+#view.v-fade.enter > * { animation: rise .56s var(--ease) both; }
+#view.v-fade.enter > *:nth-child(2) { animation-delay: .04s; }
+#view.v-fade.enter > *:nth-child(3) { animation-delay: .08s; }
+#view.v-fade.enter > *:nth-child(4) { animation-delay: .12s; }
+#view.v-fade.enter > *:nth-child(5) { animation-delay: .16s; }
+#view.v-fade.enter > *:nth-child(6) { animation-delay: .2s; }
+#view.v-fade.enter > *:nth-child(7) { animation-delay: .24s; }
+#view.v-fade.enter > *:nth-child(n+8) { animation-delay: .28s; }
+@keyframes rise { from { opacity: 0; transform: translateY(16px) scale(.985); } }
+#txlist > * { animation: none; }
+#view.enter #txlist > .daygrp, #view.enter #txlist > .day-h { animation: rise .5s var(--ease) both .12s; }
+
+/* الرسوم تكبر وتترسم */
+.enter .bars path.inc, .enter .bars path.exp { transform-box: fill-box; transform-origin: 50% 100%; animation: growY .8s var(--ease) both .18s; }
+.enter .bars path.exp { animation-delay: .26s; }
+@keyframes growY { from { transform: scaleY(0); } }
+.enter .donut-box circle.seg { animation: draw 1s var(--ease) both .12s; }
+@keyframes draw { from { stroke-dasharray: 0 999; } }
+.enter .meter i, .enter .bmeter i, .enter .segbar i { transform-origin: left center; animation: growX .9s var(--ease) both .2s; }
+.enter .tm-bar rect.fl { transform-box: fill-box; transform-origin: left center; animation: growX .9s var(--ease) both .2s; }
+@keyframes growX { from { transform: scaleX(0); } }
+
+/* الضغط */
+.btn, .ibtn, .sync-btn, .fab, .chip, .catopt, .pn, .seg button, .more, .banner { transition: transform .2s var(--ease), opacity .2s, background-color .25s, box-shadow .25s; }
+.btn:active:not(:disabled), .sync-btn:active, .chip:active, .catopt:active, .more:active, .banner:active { transform: scale(.96); opacity: .8; }
+.ibtn:active, .pn:active { transform: scale(.88); opacity: .75; }
+.fab:active { transform: scale(.9); }
+.txr, .cmr, .item, .tm-row, .legend button { transition: background-color .3s; }
+.txr:active, .cmr:active { background: var(--surface-2); border-radius: 12px; transition: none; }
+.item:active, .tm-row:active, .legend button:active { background: var(--surface-2); transition: none; }
+.seg button.on { transition: background-color .25s, box-shadow .25s, color .2s; }
+.toggle input, .toggle input::after { transition: background-color .25s, inset-inline-start .32s var(--spring); }
+.nav a { transition: color .2s; }
+.nav a svg { transition: transform .2s var(--ease); }
+.nav a:active svg { transform: scale(.84); }
+.nav a.just svg { animation: tabPop .5s var(--spring); }
+@keyframes tabPop { 0% { transform: scale(.8); } 100% { transform: scale(1); } }
+
+/* النوافذ */
+.scrim { animation: fade .32s ease-out; transition: opacity .3s; }
+.scrim.closing { opacity: 0 !important; }
+.sheet { animation: sheetUp .5s var(--ease); transition: transform .4s var(--ease); will-change: transform; }
+.sheet.closing { transform: translateY(100%) !important; transition: transform .3s cubic-bezier(.4, 0, 1, 1); animation: none; }
+@keyframes sheetUp { from { transform: translateY(100%); } }
+.dlg { animation: dlgIn .38s var(--spring); }
+@keyframes dlgIn { from { transform: scale(1.1); opacity: 0; } }
+.dlg-wrap { transition: opacity .2s; }
+.dlg-wrap.closing { opacity: 0; }
+.dlg-wrap.closing .dlg { transform: scale(.95); transition: transform .2s; }
+.shake { animation: shake .42s; }
+@keyframes shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+.toast { animation: toastIn .5s var(--spring); }
+.toast.out { animation: toastOut .26s ease-in forwards; }
+@keyframes toastIn { from { transform: translateY(-40px) scale(.9); opacity: 0; } }
+@keyframes toastOut { to { transform: translateY(-30px) scale(.95); opacity: 0; } }
+
+/* شريط العنوان الصغير */
+.minibar {
+  position: fixed; z-index: 42; top: 0; inset-inline: 0; height: calc(var(--safe-t) + 44px); padding-top: var(--safe-t);
+  display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 600; color: var(--ink);
+  background: var(--navbg); -webkit-backdrop-filter: saturate(180%) blur(20px); backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: .5px solid var(--nav-line); opacity: 0; transform: translateY(-8px); pointer-events: none;
+  transition: opacity .22s, transform .3s var(--ease);
+}
+.minibar.on { opacity: 1; transform: none; }
+.toolbar { top: calc(var(--safe-t) + 44px); }
+
+/* تبديل الثيم بنعومة */
+.theme-anim, .theme-anim * { transition: background-color .4s, color .4s, border-color .4s, fill .4s, stroke .4s !important; }
+@media (prefers-reduced-motion: reduce) { .minibar { transition: none; } }
+.back { text-decoration: none; }
 </style>
 </head>
 <body>
@@ -653,6 +739,7 @@ body::before { content: ''; position: fixed; z-index: 40; inset-inline: 0; top: 
 </div>
 <nav class="nav" aria-label="Main navigation"><div class="nav-in" id="nav"></div></nav>
 <button class="fab" id="fab" data-act="fab" aria-label="Add" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+<div id="minibar" class="minibar" aria-hidden="true"></div>
 <div id="layer"></div>
 <input type="file" id="f-sync" class="sr" accept=".txt,text/plain" tabindex="-1" aria-hidden="true">
 <input type="file" id="f-backup" class="sr" accept=".json,application/json" tabindex="-1" aria-hidden="true">
@@ -2021,7 +2108,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     el.innerHTML = (kind === 'err' ? I.alert : I.check) + '<span>' + esc(msg) + '</span>';
     document.body.appendChild(el);
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { el.remove(); }, kind === 'err' ? 5000 : 2600);
+    toastTimer = setTimeout(function () { el.classList.add('out'); setTimeout(function () { el.remove(); }, 260); }, kind === 'err' ? 5000 : 2600);
+    if (kind === 'err') haptic();
   }
   var sheetStack = [];
   function openSheet(title, body, opts) {
@@ -2041,11 +2129,17 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     layer.appendChild(sh);
     sheetStack = [scrim, sh];
     document.body.style.overflow = 'hidden';
-    if (opts.focus) { var f = $(opts.focus, sh); if (f) setTimeout(function () { f.focus(); }, 260); }
+    if (opts.focus) { var f = $(opts.focus, sh); if (f) setTimeout(function () { f.focus(); }, 340); }
+    sheetDrag(sh, scrim);
     return sh;
   }
   function closeSheet(silent) {
-    sheetStack.forEach(function (el) { el.remove(); });
+    var els = sheetStack;
+    if (silent || !els.length || reduceMotion()) els.forEach(function (el) { el.remove(); });
+    else {
+      els.forEach(function (el) { el.classList.add('closing'); el.style.transform = el.classList.contains('sheet') ? el.style.transform : ''; });
+      setTimeout(function () { els.forEach(function (el) { el.remove(); }); }, 280);
+    }
     sheetStack = [];
     document.body.style.overflow = '';
     if (!silent) S.form = null;
@@ -2065,11 +2159,11 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       if (o.onOpen) o.onOpen(wrap);
       wrap.addEventListener('click', function (ev) {
         var b = ev.target.closest('[data-v]');
-        if (!b) { if (ev.target === wrap && o.cancelable !== false) { wrap.remove(); resolve({ value: null }); } return; }
+        if (!b) { if (ev.target === wrap && o.cancelable !== false) { closeDlg(wrap); resolve({ value: null }); } return; }
         var btn = o.buttons ? o.buttons[+b.getAttribute('data-v')] : { value: true };
         var data = o.collect ? o.collect(wrap) : null;
-        if (btn.validate && !btn.validate(data, wrap)) return;
-        wrap.remove();
+        if (btn.validate && !btn.validate(data, wrap)) { shake($('.dlg', wrap)); return; }
+        closeDlg(wrap);
         resolve({ value: btn.value, data: data });
       });
     });
@@ -2079,11 +2173,137 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
       .then(function (r) { return r.value === true; });
   }
 
+  /* ---------- الحركة: انتقالات وإحساس التطبيقات ---------- */
+  function reduceMotion() { return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  // اهتزاز خفيف على آيفون (iOS 18+): الضغط على مفتاح مخفي يعطي haptic
+  var hapEl = null;
+  function haptic() {
+    try {
+      if (navigator.vibrate) { navigator.vibrate(8); return; }
+      if (!isIOS) return;
+      if (!hapEl) {
+        hapEl = document.createElement('label');
+        hapEl.setAttribute('aria-hidden', 'true');
+        hapEl.style.cssText = 'position:fixed;left:-99px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none';
+        hapEl.innerHTML = '<input type="checkbox" switch tabindex="-1">';
+        document.body.appendChild(hapEl);
+      }
+      hapEl.click();
+    } catch (e) { /* اختياري */ }
+  }
+  function closeDlg(wrap) {
+    if (reduceMotion()) { wrap.remove(); return; }
+    wrap.classList.add('closing');
+    setTimeout(function () { wrap.remove(); }, 200);
+  }
+  function shake(el) {
+    if (!el) return;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    haptic();
+  }
+  function animateView(kind) {
+    if (reduceMotion()) return;
+    var v = $('#view'), t = $('#topbar');
+    [v, t].forEach(function (el) {
+      el.classList.remove('v-fade', 'v-push', 'v-pop', 'enter');
+      void el.offsetWidth;
+      el.classList.add('v-' + kind);
+    });
+    v.classList.add('enter');
+    countUp();
+    clearTimeout(animateView.t);
+    animateView.t = setTimeout(function () { [v, t].forEach(function (el) { el.classList.remove('v-fade', 'v-push', 'v-pop', 'enter'); }); }, 900);
+  }
+  // الأرقام تعد من الصفر عند فتح الصفحة
+  function countUp() {
+    var els = $$('#view .hero .big bdi, #view .cell .v bdi, #view .cm-sum b');
+    var items = els.map(function (el) {
+      var m = el.textContent.trim().match(/^([−-]?)([\d,]+)(?:\.(\d+))?(%?)$/);
+      if (!m) return null;
+      var dec = m[3] ? m[3].length : 0, target = parseFloat(m[2].replace(/,/g, '') + (dec ? '.' + m[3] : ''));
+      return { el: el, sign: m[1], dec: dec, pct: m[4], target: target, small: !!el.querySelector('small') };
+    }).filter(Boolean);
+    if (!items.length) return;
+    var t0 = performance.now(), dur = 650;
+    var fmt = function (it, v) {
+      var parts = v.toFixed(it.dec).split('.');
+      var int = Number(parts[0]).toLocaleString('en-US');
+      return it.sign + int + (it.dec ? (it.small ? '<small>.' + parts[1] + '</small>' : '.' + parts[1]) : '') + it.pct;
+    };
+    var step = function (now) {
+      var k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      items.forEach(function (it) { if (it.el.isConnected) it.el.innerHTML = fmt(it, it.target * e); });
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+  // سحب النافذة لتحت لإغلاقها
+  function sheetDrag(sh, scrim) {
+    var body = $('.sheet-b', sh), y0 = 0, dy = 0, t0 = 0, active = false;
+    sh.addEventListener('touchstart', function (e) {
+      if (e.touches.length !== 1) return;
+      var inBody = body.contains(e.target);
+      if (inBody && body.scrollTop > 0) return;
+      if (e.target.closest('input, textarea, select')) return;
+      y0 = e.touches[0].clientY; dy = 0; t0 = Date.now(); active = true;
+    }, { passive: true });
+    sh.addEventListener('touchmove', function (e) {
+      if (!active) return;
+      dy = e.touches[0].clientY - y0;
+      if (dy <= 0) { sh.style.transform = ''; return; }
+      if (body.contains(e.target) && body.scrollTop > 0) { active = false; return; }
+      if (e.cancelable) e.preventDefault();
+      sh.style.transition = 'none';
+      sh.style.transform = 'translateY(' + dy + 'px)';
+      scrim.style.opacity = String(Math.max(0, 1 - dy / 400));
+    }, { passive: false });
+    sh.addEventListener('touchend', function () {
+      if (!active) return;
+      active = false;
+      var v = dy / Math.max(1, Date.now() - t0);
+      sh.style.transition = '';
+      if (dy > 130 || (dy > 40 && v > 0.6)) {
+        sh.style.transform = 'translateY(100%)'; scrim.style.opacity = '0';
+        closeSheet();
+      } else { sh.style.transform = ''; scrim.style.opacity = ''; }
+    });
+  }
+  // الشريط العلوي الصغير اللي يطلع لما تنزل (زي iOS)
+  var MINI_T = { home: 'Halala', tx: 'Transactions', commits: 'Monthly bills', settings: 'Settings', cats: 'Categories & budgets', rules: 'Categorization rules', guide: 'Setup guide' };
+  function updateMiniBar() {
+    var mb = $('#minibar');
+    if (!mb) return;
+    var t = MINI_T[S.ui.view] || '';
+    if (mb.textContent !== t) mb.textContent = t;
+    mb.classList.toggle('on', window.scrollY > 64);
+  }
+  var mbTick = false;
+  window.addEventListener('scroll', function () {
+    if (mbTick) return;
+    mbTick = true;
+    requestAnimationFrame(function () { mbTick = false; updateMiniBar(); });
+  }, { passive: true });
+  // سحب من طرف الشاشة اليسار للرجوع من الصفحات الفرعية
+  (function () {
+    var x0 = 0, y0 = 0, on = false;
+    document.addEventListener('touchstart', function (e) {
+      on = SUB.indexOf(S.ui.view) >= 0 && !sheetStack.length && e.touches[0].clientX < 28;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchend', function (e) {
+      if (!on) return;
+      on = false;
+      var t = e.changedTouches[0];
+      if (t.clientX - x0 > 80 && Math.abs(t.clientY - y0) < 60) location.hash = '#settings';
+    }, { passive: true });
+  })();
+
   /* ---------- الثيم ---------- */
   var mq = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
   function isDark() { return S.set.theme === 'dark' || (S.set.theme === 'auto' && mq && mq.matches); }
-  function applyTheme() {
+  function applyTheme(anim) {
     var root = document.documentElement;
+    if (anim && !reduceMotion()) { root.classList.add('theme-anim'); clearTimeout(applyTheme.t); applyTheme.t = setTimeout(function () { root.classList.remove('theme-anim'); }, 450); }
     if (S.set.theme === 'auto') root.removeAttribute('data-theme'); else root.setAttribute('data-theme', S.set.theme);
     var meta = $('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', isDark() ? '#000000' : '#F5F5F7');
@@ -2097,13 +2317,25 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   /* ---------- التوجيه ---------- */
   var VIEWS = { home: viewHome, tx: viewTx, commits: viewCommits, settings: viewSettings, cats: viewCats, rules: viewRules, guide: viewGuide };
   var NAV = [['home', 'Home', 'home'], ['tx', 'Transactions', 'list'], ['commits', 'Bills', 'cal'], ['settings', 'Settings', 'gear']];
+  var SUB = ['cats', 'rules', 'guide'], TABS = ['home', 'tx', 'commits', 'settings'], scrollMem = {};
   function route() {
     var h = (location.hash || '#home').slice(1);
     var prev = S.ui.view;
     if (sheetStack.length) closeSheet();
-    S.ui.view = VIEWS[h] ? h : 'home';
+    var next = VIEWS[h] ? h : 'home';
+    if (prev !== next) scrollMem[prev] = window.scrollY;
+    S.ui.view = next;
     render();
-    if (prev !== S.ui.view) window.scrollTo(0, 0);
+    if (prev === next) return;
+    var kind = SUB.indexOf(next) >= 0 && SUB.indexOf(prev) < 0 ? 'push' : SUB.indexOf(prev) >= 0 && SUB.indexOf(next) < 0 ? 'pop' : 'fade';
+    var y = kind === 'push' ? 0 : (scrollMem[next] || 0);
+    window.scrollTo(0, kind === 'fade' && TABS.indexOf(next) >= 0 ? y : kind === 'pop' ? y : 0);
+    animateView(kind);
+    if (TABS.indexOf(next) >= 0) {
+      var tab = $('#nav a[href="#' + next + '"]');
+      if (tab) { tab.classList.add('just'); setTimeout(function () { tab.classList.remove('just'); }, 500); }
+    }
+    updateMiniBar();
   }
   function render() {
     var v = S.ui.view;
@@ -3315,8 +3547,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   /* ---------- الأحداث ---------- */
   var ACT = {
     'sheet-close': function () { closeSheet(); },
-    'theme-toggle': function () { S.set.theme = isDark() ? 'light' : 'dark'; applyTheme(); saveSettings(); render(); },
-    'theme-set': function (el) { S.set.theme = el.getAttribute('data-v'); applyTheme(); saveSettings(); render(); },
+    'theme-toggle': function () { S.set.theme = isDark() ? 'light' : 'dark'; applyTheme(true); saveSettings(); render(); },
+    'theme-set': function (el) { S.set.theme = el.getAttribute('data-v'); applyTheme(true); saveSettings(); render(); },
     sync: function () { closeSheet(); startSync(); },
     paste: openPaste,
     'paste-clip': function () {
@@ -3413,6 +3645,10 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     'hide-install': function () { S.set.hideInstall = true; saveSettings(); render(); }
   };
   document.addEventListener('click', function (ev) {
+    var hp = ev.target.closest && ev.target.closest('.btn.pri, .seg button, .chip, .catopt, .nav a, .fab, .sync-btn, [data-act="theme-toggle"], .pn, .legend button, [data-act="bar-sel"]');
+    if (hp) haptic();
+    var navA = ev.target.closest && ev.target.closest('.nav a');
+    if (navA && navA.getAttribute('href') === '#' + S.ui.view) { ev.preventDefault(); window.scrollTo({ top: 0, behavior: reduceMotion() ? 'auto' : 'smooth' }); return; }
     var el = ev.target.closest('[data-act]');
     if (!el) return;
     var a = el.getAttribute('data-act');
@@ -3429,6 +3665,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
   });
   document.addEventListener('change', function (ev) {
     var t = ev.target, id = t.id;
+    if (hapEl && hapEl.contains(t)) return;
+    if (t.type === 'checkbox') haptic();
     if (id === 'f-period') { S.ui.f.period = t.value; S.ui.limit = 150; updateTxList(); }
     else if (id === 'f-cat') { S.ui.f.cat = t.value; S.ui.limit = 150; updateTxList(); }
     else if (id === 'f-sync') onSyncFile(t.files && t.files[0]);
@@ -3473,6 +3711,8 @@ if (typeof module !== 'undefined' && module.exports) module.exports = Parser;
     DB.open().then(loadAll).then(function () {
       applyTheme();
       route();
+      animateView('fade');
+      updateMiniBar();
       if ('serviceWorker' in navigator && (location.protocol === 'https:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname))) {
         navigator.serviceWorker.register('sw.js').catch(function () { /* يشتغل بدون */ });
       }
